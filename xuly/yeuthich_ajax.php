@@ -1,15 +1,8 @@
 <?php
 session_start();
-include_once '../cauhinh/csrf.php';
 include_once '../cauhinh/database.php';
 
 header('Content-Type: application/json');
-
-$token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
-if (!validate_csrf($token)) {
-    echo json_encode(['success'=>false, 'message'=>'CSRF token không hợp lệ']);
-    exit;
-}
 
 if (!isset($_SESSION['id_nguoidung'])) {
     echo json_encode(['success' => false, 'message' => 'Vui lòng đăng nhập']);

@@ -7,7 +7,7 @@ include_once '../thanhphan/headertrangchu.php';
 // Hàm lấy ảnh sản phẩm ngẫu nhiên theo hãng
 function getRandomProductImage($brand) {
     $imageDir = "../thuvien/hinhanh/" . $brand . "/";
-    $placeholder = "#" . $brand;
+    $placeholder = "https://via.placeholder.com/300x300/007bff/ffffff?text=" . $brand;
     
     if (!is_dir($imageDir)) {
         return $placeholder;

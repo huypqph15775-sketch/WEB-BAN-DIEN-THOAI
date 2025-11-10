@@ -1,15 +1,8 @@
 <?php
 session_start();
-include_once '../cauhinh/csrf.php';
 include_once '../cauhinh/database.php';
 
 header('Content-Type: application/json');
-
-$token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
-if (!validate_csrf($token)) {
-    echo json_encode(['success'=>false, 'message'=>'CSRF token không hợp lệ']);
-    exit;
-}
 
 if (!isset($_SESSION['id_nguoidung'])) {
     echo json_encode(['success' => false, 'message' => 'Vui lòng đăng nhập']);
@@ -25,38 +18,52 @@ try {
     
     switch ($action) {
         case 'add':
-            $id_anhsanpham = $_POST['id_anhsanpham'] ?? 0;
-    $id_nguoidung = $_SESSION['id_nguoidung'];
-
-    // ✅ Kiểm tra tồn kho
-    $check = $db->prepare("SELECT soluong_ton FROM anh_sanpham WHERE id_anhsanpham = ?");
-    $check->execute([$id_anhsanpham]);
-    $sp = $check->fetch(PDO::FETCH_ASSOC);
-    if (!$sp || $sp['soluong_ton'] <= 0) {
-        echo json_encode(['success' => false, 'message' => 'Sản phẩm tạm hết hàng']);
-        exit;
-    }
-
-    // Kiểm tra nếu đã có trong giỏ
-    $kt = $db->prepare("SELECT soluong FROM giohang WHERE id_nguoidung = ? AND id_anhsanpham = ?");
-    $kt->execute([$id_nguoidung, $id_anhsanpham]);
-    $row = $kt->fetch(PDO::FETCH_ASSOC);
-
-    if ($row) {
-        $tongsl = $row['soluong'] + 1;
-        if ($tongsl > $sp['soluong_ton']) {
-            echo json_encode(['success' => false, 'message' => 'Số lượng vượt quá tồn kho']);
-            exit;
-        }
-        $update = $db->prepare("UPDATE giohang SET soluong = ? WHERE id_nguoidung = ? AND id_anhsanpham = ?");
-        $update->execute([$tongsl, $id_nguoidung, $id_anhsanpham]);
-    } else {
-        $insert = $db->prepare("INSERT INTO giohang (id_nguoidung, id_anhsanpham, soluong) VALUES (?, ?, 1)");
-        $insert->execute([$id_nguoidung, $id_anhsanpham]);
-    }
-
-    echo json_encode(['success' => true, 'message' => 'Đã thêm vào giỏ hàng']);
-    break;
+            $product_id = $_POST['product_id'] ?? '';
+            $quantity = intval($_POST['quantity'] ?? 1);
+            
+            if (empty($product_id)) {
+                echo json_encode(['success' => false, 'message' => 'Thiếu thông tin sản phẩm']);
+                exit;
+            }
+            
+            // Lấy id_anhsanpham đầu tiên của sản phẩm
+            $checkQuery = "SELECT id_anhsanpham FROM anh_sanpham WHERE id_sanpham = ? AND trangthai = 'active' LIMIT 1";
+            $checkStmt = $db->prepare($checkQuery);
+            $checkStmt->execute([$product_id]);
+            
+            if ($checkStmt->rowCount() === 0) {
+                echo json_encode(['success' => false, 'message' => 'Sản phẩm không tồn tại']);
+                exit;
+            }
+            
+            $anh_sanpham = $checkStmt->fetch(PDO::FETCH_ASSOC);
+            $id_anhsanpham = $anh_sanpham['id_anhsanpham'];
+            
+            // Kiểm tra đã có trong giỏ chưa
+            $cartQuery = "SELECT * FROM giohang WHERE id_nguoidung = ? AND id_anhsanpham = ?";
+            $cartStmt = $db->prepare($cartQuery);
+            $cartStmt->execute([$user_id, $id_anhsanpham]);
+            
+            if ($cartStmt->rowCount() > 0) {
+                // Cập nhật số lượng
+                $updateQuery = "UPDATE giohang SET soluong = soluong + ? WHERE id_nguoidung = ? AND id_anhsanpham = ?";
+                $updateStmt = $db->prepare($updateQuery);
+                $updateStmt->execute([$quantity, $user_id, $id_anhsanpham]);
+            } else {
+                // Thêm mới
+                $insertQuery = "INSERT INTO giohang (id_nguoidung, id_anhsanpham, soluong) VALUES (?, ?, ?)";
+                $insertStmt = $db->prepare($insertQuery);
+                $insertStmt->execute([$user_id, $id_anhsanpham, $quantity]);
+            }
+            
+            // Lấy tổng số lượng giỏ hàng
+            $countQuery = "SELECT SUM(soluong) as total FROM giohang WHERE id_nguoidung = ?";
+            $countStmt = $db->prepare($countQuery);
+            $countStmt->execute([$user_id]);
+            $cart_count = $countStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+            
+            echo json_encode(['success' => true, 'cart_count' => $cart_count]);
+            break;
             
         case 'update':
             $cart_id = $_POST['cart_id'] ?? '';

@@ -33,8 +33,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Vì mật khẩu trong database đã được hash, nhưng để test tạm thời
             // Chúng ta sẽ so sánh trực tiếp với 'password' cho demo
             if ($matKhau === 'password' || password_verify($matKhau, $nguoiDung['matkhau'])) {
-                // Sau khi xác thực mật khẩu đúng
-                session_regenerate_id(true); // chống tấn công session fixation
                 // Đăng nhập thành công
                 $_SESSION['id_nguoidung'] = $nguoiDung['id_nguoidung'];
                 $_SESSION['tendangnhap'] = $nguoiDung['tendangnhap'];
